@@ -1,49 +1,90 @@
-import fs from "fs"
+import clientPromise from "../lib/mongodb.js"
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
 
-const key = req.query.site
+try{
 
-if(!key){
+const site = req.query.site
+
+if(!site){
+
 return res.status(400).json({
 error:"site parameter required"
 })
-}
-
-let data={}
-
-if(fs.existsSync("data.json")){
-data=JSON.parse(fs.readFileSync("data.json"))
-}
-
-if(!data[key]){
-
-data[key]={
-total:0,
-today:0,
-date:new Date().toISOString().slice(0,10)
-}
 
 }
 
-let today=new Date().toISOString().slice(0,10)
+const client = await clientPromise
+const db = client.db("counter")
+const visits = db.collection("visits")
 
-if(data[key].date!==today){
+const today = new Date().toISOString().slice(0,10)
 
-data[key].today=0
-data[key].date=today
+let record = await visits.findOne({ site })
+
+// If site not exists
+if(!record){
+
+await visits.insertOne({
+site:site,
+total:1,
+today:1,
+date:today
+})
+
+return res.json({
+site:site,
+total:1,
+today:1
+})
 
 }
 
-data[key].total++
-data[key].today++
+// If new day reset today counter
+if(record.date !== today){
 
-fs.writeFileSync("data.json",JSON.stringify(data,null,2))
+await visits.updateOne(
+{site},
+{
+$set:{
+today:1,
+date:today
+},
+$inc:{
+total:1
+}
+}
+)
+
+}else{
+
+await visits.updateOne(
+{site},
+{
+$inc:{
+total:1,
+today:1
+}
+}
+)
+
+}
+
+const updated = await visits.findOne({site})
 
 res.json({
-site:key,
-total:data[key].total,
-today:data[key].today
+site:updated.site,
+total:updated.total,
+today:updated.today
 })
+
+}catch(err){
+
+res.status(500).json({
+error:"server error",
+details:err.message
+})
+
+}
 
 }
