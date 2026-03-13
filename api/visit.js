@@ -2,87 +2,91 @@ import clientPromise from "../lib/mongodb.js"
 
 export default async function handler(req, res) {
 
-try{
+res.setHeader("Access-Control-Allow-Origin", "*")
+res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
+res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+
+if (req.method === "OPTIONS") {
+return res.status(200).end()
+}
+
+try {
 
 const site = req.query.site
 
-if(!site){
-
+if (!site) {
 return res.status(400).json({
-error:"site parameter required"
+error: "site parameter required"
 })
-
 }
 
 const client = await clientPromise
 const db = client.db("counter")
 const visits = db.collection("visits")
 
-const today = new Date().toISOString().slice(0,10)
+const today = new Date().toISOString().slice(0, 10)
 
 let record = await visits.findOne({ site })
 
-// If site not exists
-if(!record){
+// Site does not exist
+if (!record) {
 
-await visits.insertOne({
-site:site,
-total:1,
-today:1,
-date:today
-})
+const newRecord = {
+site: site,
+total: 1,
+today: 1,
+date: today
+}
 
-return res.json({
-site:site,
-total:1,
-today:1
-})
+await visits.insertOne(newRecord)
+
+return res.json(newRecord)
 
 }
 
-// If new day reset today counter
-if(record.date !== today){
+// New day → reset today counter
+if (record.date !== today) {
 
 await visits.updateOne(
-{site},
+{ site },
 {
-$set:{
-today:1,
-date:today
+$set: {
+today: 1,
+date: today
 },
-$inc:{
-total:1
+$inc: {
+total: 1
 }
 }
 )
 
-}else{
+} else {
 
 await visits.updateOne(
-{site},
+{ site },
 {
-$inc:{
-total:1,
-today:1
+$inc: {
+total: 1,
+today: 1
 }
 }
 )
 
 }
 
-const updated = await visits.findOne({site})
+const updated = await visits.findOne({ site })
 
 res.json({
-site:updated.site,
-total:updated.total,
-today:updated.today
+site: updated.site,
+total: updated.total,
+today: updated.today
 })
 
-}catch(err){
+} catch (err) {
 
 res.status(500).json({
-error:"server error",
-details:err.message
+error: "server error",
+details: err.message
 })
 
 }
